@@ -1,0 +1,238 @@
+---
+title: "Effects of inflorescence architecture on within-individual variation in phenology and reproductive success of flowers in Lathyrus vernus"
+subtitle: "Data preparation"
+author : "Alicia Valdés"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+options(tibble.width = Inf)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r load packages, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(moments)
+library(RColorBrewer)
+library(ggthemes)
+library(ggridges)
+```
+
+```{r Define ggplot themes and palettes, include=FALSE}
+my_theme <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(legend.position="none")+theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+my_theme_legend <- function(){
+  theme_base()+theme(plot.background=element_rect(fill="white", colour=NA))+
+  theme(text=element_text(family="serif"))+
+  theme(plot.title = element_text(hjust =-0.06))
+}
+myPalette <- colorRampPalette(brewer.pal(11, "YlOrRd"))
+```
+
+# Read data for individual flowers from Excel files
+
+```{r}
+data_id_flowers_87 <- read_excel(
+  "data/edited/individual_flower_characteristics_editsred.xlsx", 
+                       sheet = "1987")
+data_id_flowers_88 <- read_excel(
+  "data/edited/individual_flower_characteristics_editsred.xlsx", 
+                       sheet = "1988")
+data_id_flowers_89 <- read_excel(
+  "data/edited/individual_flower_characteristics_editsred.xlsx", 
+                       sheet = "1989")
+```
+
+# Data prep individual flower data
+
+```{r}
+data_id_flowers_87 <- data_id_flowers_87 %>%
+  rename(subplot=RUTA,number=GENET...2,
+         shoot_id=SKOTT, # Empty when only one?
+         raceme_id=KLASE,flower_id=BLOMMA,
+         tot_racemes_in_shoot=TOTKLAS, # Total racemes of the shoot
+         tot_flowers_in_raceme=TOTBLOM, # Total flowers of the raceme
+         # Check that these two match with counts!
+         fl_phen=BLOMFENO,fl_status=Blomstatus, # Seem equivalent
+         n_ovules=OVULER,
+         n_seeds=FR,n_pred_seeds=PREDERAD, # Check that this means this
+         relpos_fl=Relpos,relpos_rac=Relraceme,
+         opening_date=`New Phenoadj based on intervals`,
+         fate_code=Framgångredef)%>%
+  # Check what each code means
+  # Values go from 1 to 7 
+  # All flowers that have seeds have the code 5
+  dplyr::select(-Drecords,-FRAMGANG,-`Ny framgång`,-`Nyny framgång`,
+                -AGG,-...19,-Success,-Phenolcorr,-Phenoladj,
+                -GENET...27,-`Diff z-x`,-ID,
+                -`New Phenomean for corrections based on intervals`)%>%
+  # Remove empty columns and columns which I'm not sure would be useful
+  # (maybe will use later)
+  mutate(id = paste(subplot,number,sep=":"),year="1987",
+         raceme_id=ifelse(is.na(raceme_id),4,raceme_id),
+         # Fill raceme_id with 4 in two cases where it was missing
+         # And total nr of racemes of the plant was 4
+         relpos_fl=flower_id/(tot_flowers_in_raceme+1),
+         relpos_rac=raceme_id/(tot_racemes_in_shoot+1)) # Recalculate
+data_id_flowers_88 <- data_id_flowers_88 %>%
+  rename(subplot=RUTA...1,number=GENET...2,
+         shoot_id=SKOTT...3, # Empty when only one?
+         raceme_id=KLASE...4,flower_id=BLOMMA...5,
+         tot_racemes_in_shoot=TOTKLAS...6, # Total racemes of the shoot
+         tot_flowers_in_raceme=TOTBLOM...7, # Total flowers of the raceme
+         # Check that these two match with counts!
+         fl_phen=BLOMFENO...8,fl_status=Blomstatus, # Seem equivalent
+         n_ovules=OVULER,
+         n_seeds=FR,n_pred_seeds=PREDERAD, # Check that this means this
+         opening_date=`New Phenoadj based on intervals`,
+         fate_code=Framgångredef...16)%>%
+  dplyr::select(-`Phenocorrections based on intervals`,-Genet,
+                -FRAMGANG...13,-`Ny FRAMGÅNG`,-`Nyny framgång`,
+                -AGG,-Komm,-RUTA...22,-GENET...23,
+                -SKOTT...24,-KLASE...25,-BLOMMA...26,-TOTKLAS...27,
+                -TOTBLOM...28,-BLOMFENO...29,-FRAMGANG...30,-Check1,
+                -Framgångredef...32,-Framgångsdiff,-...34) %>%
+  # Remove empty columns and columns which I'm not sure would be useful
+  # (maybe will use later)
+  mutate(id = paste(subplot,number,sep=":"),year="1988",
+         relpos_fl=flower_id/(tot_flowers_in_raceme+1),
+         relpos_rac=raceme_id/(tot_racemes_in_shoot+1))%>%
+  filter(!is.na(relpos_fl)) # Remove one row with all NAs
+data_id_flowers_89 <- data_id_flowers_89 %>%
+  rename(subplot=RUTA,number=GENET,
+         shoot_id=SKOTT, # Empty when only one?
+         raceme_id=KLASE,flower_id=BLOMMA,
+         tot_racemes_in_shoot=TOTKLAS, # Total racemes of the shoot
+         tot_flowers_in_raceme=TOTBLOM, # Total flowers of the raceme
+         # Check that these two match with counts!
+         fl_phen=BLOMFENO,fl_status=Blomstatus, # Seem equivalent
+         n_ovules=OVULER,
+         n_seeds=FRÖN,n_pred_seeds=PREDERAD, # Check that this means this
+         opening_date=`Corrected pheno`,
+         fate_code=Framgångredef)%>%
+  dplyr::select(-Phenocorrection,-FRAMGANG,-`Ny framgång`,-`Nyny framgång`,
+                -Genet,-HÅL,-Komm,-...22,
+                -...23,-...24,-...25) %>%
+  # Remove empty columns and columns which I'm not sure would be useful
+  # (maybe will use later)
+  mutate(id = paste(subplot,number,sep=":"),year="1989",
+         relpos_fl=flower_id/(tot_flowers_in_raceme+1),
+         relpos_rac=raceme_id/(tot_racemes_in_shoot+1))
+```
+
+```{r}
+data_id_flowers<-full_join(
+  full_join(data_id_flowers_87,data_id_flowers_88),
+  data_id_flowers_89)%>%
+  mutate(shoot_id=ifelse(is.na(shoot_id),1,shoot_id))
+# Assign shoot_id=1 to all cases where NA
+```
+
+```{r}
+tot_shoots_in_plant<-data_id_flowers%>%group_by(year,id)%>%
+  summarise(tot_shoots_in_plant=n_distinct(shoot_id))
+tot_racemes_in_shoot<-data_id_flowers%>%group_by(year,id,shoot_id)%>%
+  summarise(tot_racemes_in_shoot_1=n_distinct(raceme_id))
+tot_flowers_in_raceme<-data_id_flowers%>%group_by(year,id,shoot_id,raceme_id)%>%
+  summarise(tot_flowers_in_raceme_1=n_distinct(flower_id))
+```
+
+```{r}
+data_id_flowers<-data_id_flowers%>%
+  left_join(tot_shoots_in_plant)%>%
+  left_join(tot_racemes_in_shoot)%>%
+  left_join(tot_flowers_in_raceme)%>%
+  dplyr::select(-tot_racemes_in_shoot,-tot_flowers_in_raceme)%>%
+  rename(tot_racemes_in_shoot=tot_racemes_in_shoot_1,
+         tot_flowers_in_raceme=tot_flowers_in_raceme_1)%>%
+  # Substitute tot_racemes_in_shoot and tot_flowers_in_raceme
+  # with my calculations, as there were some errors in the Excel file
+  mutate(relpos_fl=flower_id/(tot_flowers_in_raceme+1),
+         relpos_rac=raceme_id/(tot_racemes_in_shoot+1))
+# Recalculate with the correct total values
+```
+
+# Transform dates
+
+The dates are given in terms of four- or five-day intervals after the first recording. Convert them to calendar dates, then to julian dates, and then to number of days after the vernal equinox.
+
+First create a table with information on each date for each year.
+
+```{r}
+dates <- tibble(year = as.factor(
+  c(rep("1987",10),rep("1988",10),rep("1989",10))),
+                date_num = rep(1:10,3), # Date in numeric format given in data
+                date_calendar = as.Date(
+                  ifelse(year==1987, seq(as.Date("1987-05-18"), 
+                                         by = 4, length.out = 10),
+                         # 1987: Start 18 May, 4-day intervals
+                         ifelse(year==1988, seq(as.Date("1988-05-15"),
+                                                by = 5, length.out = 10),
+                                # 1988: Start 15 May, 5-day intervals
+                                seq(as.Date("1989-05-07"), 
+                                    by = 5, length.out = 10))),
+                  # 1989: Start 7 May, 5-day intervals
+                  # Calendar date
+                  origin = "1970-01-01"),
+  date_julian = yday(date_calendar), # Julian date
+  date_vernal = ifelse(year==1987,date_calendar-as.Date("1987-03-21"),
+                       ifelse(year==1988,date_calendar-as.Date("1988-03-20"),
+                              date_calendar-as.Date("1989-03-20")))) 
+# Days after vernal equinox
+# Data on vernal equinox dates from https://data.giss.nasa.gov/ar5/srvernal.html
+```
+
+Calculate, for each year, the intercept and slope of the relationship among date_num (x)
+and date_vernal or date_calendar (y).
+
+```{r}
+dates <- dates %>%
+  group_by(year) %>%
+  mutate(date_intercept_v = ifelse(year==1987,min(date_vernal)-4,
+                                 min(date_vernal)-5),
+         date_intercept_c = as.Date(ifelse(year==1987,min(date_calendar)-4,
+                                 min(date_calendar)-5),origin = "1970-01-01"),
+         date_slope_v = (date_vernal-date_intercept_v)/date_num,
+         date_slope_c = (date_calendar-date_intercept_c)/date_num)
+dates_summary <- summarise(dates, 
+                           date_intercept_v = mean(date_intercept_v),
+                           date_intercept_c = mean(date_intercept_c),
+                           date_slope_v = mean(date_slope_v),
+                           date_slope_c = mean(date_slope_c))
+```
+
+Add to individual flower data.
+
+```{r}
+data_id_flowers<-data_id_flowers%>%
+  mutate(year=as.factor(year))%>%
+  left_join(dates_summary, by = c("year" = "year"))%>%
+  mutate(opening_date_c=date_slope_c*opening_date+date_intercept_c,
+         opening_date_v=date_slope_v*opening_date+date_intercept_v,
+         year=as.factor(year))%>%
+  dplyr::select(-date_intercept_v,-date_intercept_c,-date_slope_v,-date_slope_c)
+```
+
+# Save clean data as .csv
+
+```{r}
+write_csv(data_id_flowers,"data/clean/data_id_flowers.csv")
+```
+
+# Session info
+
+```{r}
+sessionInfo()
+```
+
