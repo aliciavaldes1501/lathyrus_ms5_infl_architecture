@@ -70,8 +70,13 @@ data_id_flowers_87 <- data_id_flowers_87 %>%
          relpos_fl=Relpos,relpos_rac=Relraceme,
          opening_date=`New Phenoadj based on intervals`,
          fate_code=Framgångredef)%>%
-  # Check what each code means
-  # Values go from 1 to 7 
+  # 1 - aborted as flower
+  # 2 - aborted as very small fruit
+  # 3 - aborted as intermediate-sized fruit
+  # 4 - aborted as large but not mature fruit
+  # 5 - mature fruits with mature seeds
+  # 6 - eaten/removed as flower or very small fruit
+  # 7 - eaten/removed as intermediate or large fruit
   # All flowers that have seeds have the code 5
   dplyr::select(-Drecords,-FRAMGANG,-`Ny framgång`,-`Nyny framgång`,
                 -AGG,-...19,-Success,-Phenolcorr,-Phenoladj,
@@ -135,8 +140,16 @@ data_id_flowers_89 <- data_id_flowers_89 %>%
 data_id_flowers<-full_join(
   full_join(data_id_flowers_87,data_id_flowers_88),
   data_id_flowers_89)%>%
-  mutate(shoot_id=ifelse(is.na(shoot_id),1,shoot_id))
-# Assign shoot_id=1 to all cases where NA
+  mutate(shoot_id=ifelse(is.na(shoot_id),1,shoot_id))%>%
+  # Assign shoot_id=1 to all cases where NA
+  mutate(fruit_set=factor(ifelse(fate_code==5,1,0)),
+         initiated_fr=factor(ifelse(fate_code==2|fate_code==3|fate_code==4|
+                                      fate_code==5|fate_code==7,1,0)),
+         seed_set=n_seeds/n_ovules,
+         prop_pred_seeds=round(n_pred_seeds)/n_seeds,
+         seed_predation=ifelse(is.na(prop_pred_seeds),NA,
+                               ifelse(n_pred_seeds>0,1,0)),
+         year=factor(year))
 ```
 
 ```{r}
@@ -222,6 +235,15 @@ data_id_flowers<-data_id_flowers%>%
          opening_date_v=date_slope_v*opening_date+date_intercept_v,
          year=as.factor(year))%>%
   dplyr::select(-date_intercept_v,-date_intercept_c,-date_slope_v,-date_slope_c)
+```
+
+# Create unique ids for shoots, racemes and flowers
+
+```{r}
+data_id_flowers<-data_id_flowers%>%
+  mutate(unique_shoot_id=paste(year,id,shoot_id,sep="_"),
+         unique_raceme_id=paste(year,id,shoot_id,raceme_id,sep="_"),
+         unique_flower_id=paste(year,id,shoot_id,raceme_id,flower_id,sep="_"))
 ```
 
 # Save clean data as .csv

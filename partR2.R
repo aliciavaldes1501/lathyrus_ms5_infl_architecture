@@ -1,0 +1,9 @@
+library(lme4)
+library(lmerTest)
+library(partR2)
+model1<-lmer(opening_date_v~shoot_id/raceme_id+(1|id),
+                data=subset(data_id_flowers,year==1987))
+summary(model1)
+partR2(model1,partvars=c("shoot_id","shoot_id:raceme_id"),R2_type="marginal",nboot=100)
+forestplot(partR2(model1,partvars=c("shoot_id","shoot_id:raceme_id"),R2_type="marginal",nboot=100))
+forestplot(partR2(model1,partvars=c("shoot_id","shoot_id:raceme_id"),R2_type="conditional",nboot=100))
