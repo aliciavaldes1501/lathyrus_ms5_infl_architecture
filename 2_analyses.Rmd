@@ -34,6 +34,14 @@ library(lmerTest)
 library(performance)
 library(partR2)
 library(DHARMa)
+library(car)
+library(piecewiseSEM)
+library(semEff)
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(lavaanPlot)
+library(magrittr)
+library(rsvg)
 ```
 
 ```{r Define ggplot themes and palettes, include=FALSE}
@@ -83,6 +91,8 @@ data_id_flowers<-left_join(data_id_flowers,
                                          min(opening_date_v),
                                        var_opening_date=var(opening_date_v)))
 ```
+
+# Figure 1: Lathyrus vernus architechture (Inkscape)
 
 # Q1: Components of variation
 
@@ -475,50 +485,9 @@ ggsave(filename="output/figures/fig2.tiff",
        width=22,height=10,units="cm",dpi=300)
 ```
 
+# Q2: Effects of flower position on opening date, reproductive success, ovule number and seed predation of individual flowers
 
-# Q2: Effects of flower position on flowering phenology 
-
-Does opening date of individual flowers depend on flower position within and among the racemes?
-
-H: We expect that basal flowers open earlier than distal flowers within the raceme, and that flowers on basal racemes open earlier than flowers on distal racemes.
-
-## Model all years
-
-Including year as a factor and interactions
-
-```{r}
-mod_phen_all<-glmmTMB(opening_date_v~(relpos_fl*relpos_rac)*year+
-                       (1|id/shoot_id/raceme_id),data_id_flowers)
-# OK with random factors and nesting?
-summary(mod_phen_all)
-Anova(mod_phen_all)
-```
-
-### Diagnostics
-
-```{r}
-plot(simulateResiduals(mod_phen_all,n=1000))
-```
-
-### Table 1
-
-```{r}
-tab_model(mod_phen_all,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          file="output/tables/Table1_all.doc")
-```
-
-### Figure 3
-
-```{r}
-fig3_all<-grid.arrange(plot(ggpredict(mod_phen_all,
-               terms=c("relpos_fl[quart]","relpos_rac[quart]","year"))))
-ggsave(filename="output/figures/fig3_all.tiff",plot=fig3_all,
-       width=20,height=8,units="cm",dpi=300)
-```
-
-## Yearly models
+## Opening date
 
 ```{r}
 mod_phen_87<-glmmTMB(opening_date_v~relpos_fl*relpos_rac+
@@ -546,14 +515,12 @@ plot(simulateResiduals(mod_phen_88,n=1000))
 plot(simulateResiduals(mod_phen_89,n=1000))
 ```
 
-### Table 1
+### Check for singular fit
 
 ```{r}
-tab_model(mod_phen_87,mod_phen_88,mod_phen_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),
-          file="output/tables/Table1.doc")
+check_singularity(mod_phen_87)
+check_singularity(mod_phen_88)
+check_singularity(mod_phen_89)
 ```
 
 ### Figure 3
@@ -576,7 +543,7 @@ Flowers on basal racemes (lower relpos_rac) open earlier than flowers on distal 
 
 Basal flowers on basal racemes (lower relpos_fl and lower relpos_rac) open the earliest, and distal flowers on distal racemes (higher relpos_fl and higher relpos_rac) open the latest.
 
-# Q3: Effects of flower position on reproductive success
+## Reproductive success
 
 Does reproductive success of individual flowers depend on flower position within and among the racemes, and are effects of flower position due to different resource accessibility or to different phenologies of individual flowers?
 
@@ -589,187 +556,7 @@ hist(data_id_flowers$fruit_set)
 hist(data_id_flowers$seed_set)
 ```
 
-## Models all years
-
-### Probability of initiating fruit
-
-#### Without phenology
-
-```{r}
-mod_frinit_all<-glmmTMB(initiated_fr~(relpos_fl*relpos_rac)*year+
-                      (1|id/shoot_id/raceme_id),data_id_flowers,
-                      family="binomial")
-# OK with random factors and nesting?
-summary(mod_frinit_all)
-Anova(mod_frinit_all)
-```
-
-#### With phenology
-
-```{r}
-mod_frinit_phen_all<-glmmTMB(initiated_fr~
-                               (relpos_fl*relpos_rac+opening_date_v)*year+
-                               (1|id/shoot_id/raceme_id),
-                             data_id_flowers,family="binomial")
-# OK with random factors and nesting?
-summary(mod_frinit_phen_all)
-Anova(mod_frinit_phen_all)
-```
-
 ### Probability of setting fruit
-
-#### Without phenology
-
-```{r}
-mod_frset_all<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)*year+
-                      (1|id/shoot_id/raceme_id),
-                    data_id_flowers,family="binomial")
-# OK with random factors and nesting?
-summary(mod_frset_all)
-Anova(mod_frset_all)
-```
-
-#### With phenology
-
-```{r}
-mod_frset_phen_all<-glmmTMB(fruit_set~
-                              (relpos_fl*relpos_rac+opening_date_v)*year+
-                      (1|id/shoot_id/raceme_id),
-                    data_id_flowers,family="binomial")
-# OK with random factors and nesting?
-summary(mod_frset_phen_all)
-Anova(mod_frset_phen_all)
-```
-
-### Seed set
-
-#### Without phenology
-
-```{r}
-mod_seedset_all<-glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~
-                           (relpos_fl*relpos_rac)*year+
-                           (1|id/shoot_id/raceme_id),
-                         data_id_flowers,family="binomial")
-summary(mod_seedset_all)
-Anova(mod_seedset_all)
-```
-
-No significant effects on seed set (apart from year).
-
-Not fitting models with phenology because we found no effects of flower position on seed set.
-
-### Diagnostics
-
-```{r}
-plot(simulateResiduals(mod_frinit_all,n=1000))
-plot(simulateResiduals(mod_frinit_phen_all,n=1000))
-plot(simulateResiduals(mod_frset_all,n=1000))
-plot(simulateResiduals(mod_frset_phen_all,n=1000))
-plot(simulateResiduals(mod_seedset_all,n=1000))
-```
-
-### Figures 4-5
-
-```{r}
-fig4_all<-grid.arrange(
-  plot(ggpredict(mod_frinit_all,
-                 terms=c("relpos_fl[quart]","relpos_rac[quart]","year")))+
-    ggtitle("A) Fruit initiation, without opening date"),
-  plot(ggpredict(mod_frinit_phen_all,
-                 terms=c("relpos_fl[quart]","relpos_rac[quart]","year")))+
-    ggtitle("B) Fruit initiation, with opening date"),
-  plot(ggpredict(mod_frinit_phen_all,terms=c("opening_date_v"))),
-  ncol=1)
-fig4_all
-ggsave(filename="output/figures/fig4_all.tiff",plot=fig4_all,
-       width=30,height=30,units="cm",dpi=300)
-```
-
-```{r}
-fig5_all<-grid.arrange(
-  plot(ggpredict(mod_frset_all,terms=c("relpos_fl[all]","year")))+
-    ggtitle("A) Fruit set, without opening date"),
-  plot(ggpredict(mod_frset_all,terms=c("relpos_rac[all]")))+ggtitle(NULL),
-  plot(ggpredict(mod_frset_phen_all,terms=c("relpos_fl[all]")))+
-    ggtitle("B) Fruit set, with opening date"),
-  plot(ggpredict(mod_frset_phen_all,terms=c("opening_date_v")))+ggtitle(NULL),
-  ncol=2,nrow=2)
-fig5_all
-ggsave(filename="output/figures/fig5_all.tiff",plot=fig5_all,
-       width=18,height=12,units="cm",dpi=300)
-```
-
-## Yearly models
-
-### Probability of initiating fruit
-
-#### Without phenology
-
-```{r}
-mod_frinit_87<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1987),family="binomial")
-mod_frinit_88<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1988),family="binomial")
-mod_frinit_89<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1989),family="binomial")
-# OK with random factors and nesting?
-summary(mod_frinit_87)
-summary(mod_frinit_88)
-summary(mod_frinit_89)
-```
-
-Interaction only significant in 1989 (marginally significant in 1988). Refit models for 1987 and 1988 without interaction.
-
-```{r}
-mod_frinit_87<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1987),family="binomial")
-mod_frinit_88<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1988),family="binomial")
-# OK with random factors and nesting?
-summary(mod_frinit_87)
-summary(mod_frinit_88)
-```
-
-Basal flowers (lower relpos_fl) have a higher probability of initiating fruit than distal flowers within the raceme.
-Flowers on basal racemes (lower relpos_rac) have a higher probability of initiating fruit than flowers on distal racemes.
-In 1989, basal flowers on basal racemes (lower relpos_fl and lower relpos_rac) have the highest probabilities of initiating fruit, and distal flowers on distal racemes (higher relpos_fl and higher relpos_rac) the lowest.
-
-#### With phenology
-
-Fit the same models as before but including opening_date_v.
-
-```{r}
-mod_frinit_phen_87<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+opening_date_v+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1987),family="binomial")
-mod_frinit_phen_88<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+opening_date_v+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1988),family="binomial")
-mod_frinit_phen_89<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+opening_date_v+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1989),family="binomial")
-# OK with random factors and nesting?
-summary(mod_frinit_phen_87)
-summary(mod_frinit_phen_88)
-summary(mod_frinit_phen_89)
-```
-
-Flowers opening earlier have a higher probability of initiating fruit. 
-
-1987 and 1988: Basal flowers (lower relpos_fl) have a higher probability of initiating fruit than distal flowers within the raceme. 
-
-1989: When including opening date in the model, the interaction is still significant, but in this case distal flowers on distal racemes (higher relpos_fl and higher relpos_rac) have the lowest probabilities of intiating fruit, and basal flowers on distal racemes (lower relpos_fl and higher relpos_rac) the highest (the lines cross). The contribution of the effect of flower position among racemes to the interaction changes when including opening date in the model. Does this indicate that the effect of flower position among racemes is mainly due to different phenologies of individual flowers?
-
-The effect of flower position among racemes seems to be mainly due to different phenologies of individual flowers, and the effect of flower position within the raceme seems to be mainly due to different resource accessibility. 
-
-### Probability of setting fruit
-
-#### Without phenology
 
 ```{r}
 mod_frset_87<-glmmTMB(fruit_set~relpos_fl*relpos_rac+
@@ -805,37 +592,7 @@ Basal flowers (lower relpos_fl) have a higher probability of setting fruit than 
 Flowers on basal racemes (lower relpos_rac) have a higher probability of setting fruit than flowers on distal racemes.
 In 1987, basal flowers on basal racemes (lower relpos_fl and lower relpos_rac) have the highest probabilities of setting fruit, and distal flowers on distal racemes (higher relpos_fl and higher relpos_rac) the lowest.
 
-#### With phenology
-
-Fit the same models as before but including opening_date_v.
-
-```{r}
-mod_frset_phen_87<-glmmTMB(fruit_set~relpos_fl*relpos_rac+opening_date_v+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1987),family="binomial")
-mod_frset_phen_88<-glmmTMB(fruit_set~relpos_fl+relpos_rac+opening_date_v+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1988),family="binomial")
-mod_frset_phen_89<-glmmTMB(fruit_set~relpos_fl+relpos_rac+opening_date_v+
-                      (1|id/shoot_id/raceme_id),
-                    subset(data_id_flowers,year==1989),family="binomial")
-# OK with random factors and nesting?
-summary(mod_frset_phen_87)
-summary(mod_frset_phen_88)
-summary(mod_frset_phen_89)
-```
-
-Flowers opening earlier have a higher probability of setting fruit. 
-
-1987: When including opening date in the model, the interaction is still significant, but in this case basal flowers on basal racemes (lower relpos_fl and lower relpos_rac) have the highest probabilities of setting fruit, and distal flowers on basal racemes (higher relpos_fl and lower relpos_rac) the lowest (the lines cross). The contribution of the effect of flower position among racemes to the interaction changes when including opening date in the model. Does this indicate that the effect of flower position among racemes is mainly due to different phenologies of individual flowers?
-
-1988 and 1989: Basal flowers (lower relpos_fl) have a higher probability of initiating fruit than distal flowers within the raceme. 
-
-The effect of flower position among racemes seems to be mainly due to different phenologies of individual flowers, and the effect of flower position within the raceme seems to be mainly due to different resource accessibility. 
-
 ### Seed set
-
-#### Without phenology
 
 ```{r}
 mod_seedset_87<-glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~relpos_fl*relpos_rac+
@@ -871,117 +628,102 @@ summary(mod_seedset_89)
 
 No significant effects on seed set.
 
-Not fitting models with phenology because we found no effects of flower position on seed set.
+Not fitting path models for seed set because we found no effects of flower position on seed set.
 
 ### Diagnostics
 
 ```{r}
-plot(simulateResiduals(mod_frinit_87,n=1000))
-plot(simulateResiduals(mod_frinit_phen_87,n=1000))
 plot(simulateResiduals(mod_frset_87,n=1000))
-plot(simulateResiduals(mod_frset_phen_87,n=1000))
 plot(simulateResiduals(mod_seedset_87,n=1000))
-plot(simulateResiduals(mod_frinit_88,n=1000))
-plot(simulateResiduals(mod_frinit_phen_88,n=1000))
 plot(simulateResiduals(mod_frset_88,n=1000))
-plot(simulateResiduals(mod_frset_phen_88,n=1000))
 plot(simulateResiduals(mod_seedset_88,n=1000))
-plot(simulateResiduals(mod_frinit_89,n=1000))
-plot(simulateResiduals(mod_frinit_phen_89,n=1000))
 plot(simulateResiduals(mod_frset_89,n=1000))
-plot(simulateResiduals(mod_frset_phen_89,n=1000))
 plot(simulateResiduals(mod_seedset_89,n=1000))
 ```
 
-### Table 2
+### Check for singular fit
 
 ```{r}
-tab_model(mod_frinit_87,mod_frinit_88,mod_frinit_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),title="Fruit initiation",
-          file="output/tables/Table2a.doc")
+check_singularity(mod_frset_87)
+check_singularity(mod_seedset_87)
+check_singularity(mod_frset_88)
+check_singularity(mod_seedset_88)
+check_singularity(mod_frset_89)
+check_singularity(mod_seedset_89) # FALSE
+```
+
+All but mod_seedset_89 show a singular fit.
+
+Refit without random effect of raceme_id and check again for singular fit
+
+```{r}
+mod_frset_87_no_raceme_id<-glmmTMB(fruit_set~relpos_fl*relpos_rac+
+                      (1|id/shoot_id),
+                    subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_88_no_raceme_id<-glmmTMB(fruit_set~relpos_fl+relpos_rac+
+                      (1|id/shoot_id),
+                    subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_no_raceme_id<-glmmTMB(fruit_set~relpos_fl+relpos_rac+
+                      (1|id/shoot_id),
+                    subset(data_id_flowers,year==1989),family="binomial")
+mod_seedset_87_no_raceme_id<-glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~
+                                       relpos_fl+relpos_rac+
+                          (1|id/shoot_id),
+                        subset(data_id_flowers,year==1987),family="binomial")
+mod_seedset_88_no_raceme_id<-glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~
+                                       relpos_fl+relpos_rac+
+                          (1|id/shoot_id),
+                        subset(data_id_flowers,year==1988),family="binomial")
 ```
 
 ```{r}
-tab_model(mod_frinit_phen_87,mod_frinit_phen_88,mod_frinit_phen_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),title="Fruit initiation",
-          file="output/tables/Table2b.doc")
+check_singularity(mod_frset_87_no_raceme_id) # FALSE
+check_singularity(mod_seedset_87_no_raceme_id)
+check_singularity(mod_frset_88_no_raceme_id)
+check_singularity(mod_seedset_88_no_raceme_id) # FALSE
+```
+
+Most models still show a singular fit.
+
+Refit those also without random effect of shoot_id and check again for singular fit
+
+```{r}
+mod_frset_88_no_raceme_id_no_shoot_id<-glmmTMB(fruit_set~relpos_fl+relpos_rac+
+                      (1|id),
+                    subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_no_raceme_id_no_shoot_id<-glmmTMB(fruit_set~relpos_fl+relpos_rac+
+                      (1|id),
+                    subset(data_id_flowers,year==1989),family="binomial")
+mod_seedset_88_no_raceme_id_no_shoot_id<-glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~
+                                       relpos_fl+relpos_rac+
+                          (1|id),
+                        subset(data_id_flowers,year==1988),family="binomial")
 ```
 
 ```{r}
-tab_model(mod_frset_87,mod_frset_88,mod_frset_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),title="Fruit set",
-          file="output/tables/Table2c.doc")
+check_singularity(mod_frset_88_no_raceme_id_no_shoot_id)
+check_singularity(mod_frset_89_no_raceme_id_no_shoot_id)
+check_singularity(mod_seedset_88_no_raceme_id_no_shoot_id)
 ```
 
+All OK now.
+
+Check summaries of new (not singular) models to see if estimates, significances etc. are similar to those in previous models.
+
 ```{r}
-tab_model(mod_frset_phen_87,mod_frset_phen_88,mod_frset_phen_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),title="Fruit set",
-          file="output/tables/Table2d.doc")
+summary(mod_frset_87_no_raceme_id)
+summary(mod_seedset_88_no_raceme_id)
+summary(mod_frset_89_no_raceme_id)
+summary(mod_frset_88_no_raceme_id_no_shoot_id)
+summary(mod_frset_89_no_raceme_id_no_shoot_id)
+summary(mod_seedset_88_no_raceme_id_no_shoot_id)
 ```
 
-```{r}
-tab_model(mod_seedset_87,mod_seedset_88,mod_seedset_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),title="Seed set",
-          file="output/tables/Table2e.doc")
-```
+Yes, they are similar, so I guess we can use models with singular fit if we want to mantain the random effect structure similar for all models. If we want to get R squares, we should use models without singular fit.
 
-### Figures 4-5
+### Figure 4
 
 ```{r}
-# Fruit initiation, without opening date
-plot_fr_init_87<-grid.arrange(
-  plot(ggpredict(mod_frinit_87,terms="relpos_fl[all]"))+ggtitle("1987"),
-  plot(ggpredict(mod_frinit_87,terms="relpos_rac[all]"))+ggtitle("1987"),
-  ncol=1)
-plot_fr_init_88<-grid.arrange(
-  plot(ggpredict(mod_frinit_88,terms="relpos_fl[all]"))+ggtitle("1988"),
-  plot(ggpredict(mod_frinit_88,terms="relpos_rac[all]"))+ggtitle("1988"),
-  ncol=1)
-plot_fr_init_89<-plot(ggpredict(mod_frinit_89,
-                                terms=c("relpos_fl[quart]",
-                                        "relpos_rac[quart]")))+ggtitle("1989")
-
-plot_fr_init<-grid.arrange(plot_fr_init_87,plot_fr_init_88,plot_fr_init_89,
-                           ncol=3,widths=c(0.75,0.75,1),
-                           top="A) Fruit initiation, without opening date")
-
-# Fruit initiation, with opening date
-plot_fr_init_phen_87<-grid.arrange(
-  plot(ggpredict(mod_frinit_phen_87,terms="relpos_fl[all]"))+
-    ggtitle("1987"),
-  plot(ggpredict(mod_frinit_phen_87,terms="opening_date_v[all]"))+
-    ggtitle("1987"),
-  ncol=1)
-plot_fr_init_phen_88<-grid.arrange(
-  plot(ggpredict(mod_frinit_phen_88,terms="relpos_fl[all]"))+
-    ggtitle("1988"),
-  plot(ggpredict(mod_frinit_phen_88,terms="opening_date_v[all]"))+
-    ggtitle("1988"),
-  ncol=1)
-plot_fr_init_phen_89<-grid.arrange(
-  plot(ggpredict(mod_frinit_phen_89,
-                 terms=c("relpos_fl[quart]","relpos_rac[quart]")))+
-    ggtitle("1989"),
-  plot(ggpredict(mod_frinit_phen_89,terms="opening_date_v[all]"))+
-    ggtitle("1989"),
-  ncol=1)
-
-plot_fr_init_phen<-grid.arrange(plot_fr_init_phen_87,plot_fr_init_phen_88,
-                                plot_fr_init_phen_89,
-                           ncol=3,
-                           top="B) Fruit initiation, with opening date")
-
-# Fruit set, without opening date
 plot_fr_set_87<-plot(ggpredict(mod_frset_87,
                                terms=c("relpos_fl[quart]",
                                        "relpos_rac[quart]")))+ggtitle("1987")
@@ -994,56 +736,14 @@ plot_fr_set_89<-grid.arrange(
   plot(ggpredict(mod_frset_89,terms="relpos_rac[all]"))+ggtitle("1989"),
   ncol=1)
 
-plot_fr_set<-grid.arrange(plot_fr_set_87,plot_fr_set_88,plot_fr_set_89,
-                          ncol=3,widths=c(1,0.75,0.75),
-                          top="A) Fruit set, without opening date")
-
-# Fruit set, with opening date
-plot_fr_set_phen_87<-grid.arrange(
-  plot(ggpredict(mod_frset_phen_87,
-                 terms=c("relpos_fl[quart]","relpos_rac[quart]")))+
-    ggtitle("1987"),
-  plot(ggpredict(mod_frset_phen_87,terms="opening_date_v[all]"))+
-    ggtitle("1987"),
-  ncol=1)
-plot_fr_set_phen_88<-grid.arrange(
-  plot(ggpredict(mod_frset_phen_88,terms="relpos_fl[all]"))+
-    ggtitle("1988"),
-  plot(ggpredict(mod_frset_phen_88,terms="opening_date_v[all]"))+
-    ggtitle("1988"),
-  ncol=1)
-plot_fr_set_phen_89<-grid.arrange(
-  plot(ggpredict(mod_frset_phen_89,terms="relpos_fl[all]"))+
-    ggtitle("1989"),
-  plot(ggpredict(mod_frset_phen_89,terms="opening_date_v[all]"))+
-    ggtitle("1989"),
-  ncol=1)
-
-plot_fr_set_phen<-grid.arrange(plot_fr_set_phen_87,plot_fr_set_phen_88,
-                               plot_fr_set_phen_89,
-                               ncol=3,
-                               top="B) Fruit set, with opening date")
-```
-
-```{r}
-fig4<-grid.arrange(plot_fr_init,plot_fr_init_phen,ncol=1)
-fig4
+fig4<-grid.arrange(plot_fr_set_87,plot_fr_set_88,plot_fr_set_89,
+                          ncol=3,widths=c(1,0.75,0.75))
+plot(fig4)
 ggsave(filename="output/figures/fig4.tiff",plot=fig4,
-       width=30,height=30,units="cm",dpi=300)
+       width=30,height=15,units="cm",dpi=300)
 ```
 
-```{r}
-fig5<-grid.arrange(plot_fr_set,plot_fr_set_phen,ncol=1)
-fig5
-ggsave(filename="output/figures/fig5.tiff",plot=fig5,
-       width=30,height=30,units="cm",dpi=300)
-```
-
-# Q4: Architectural patterns in fruit set depend on fruit initiation
-
-# Q5: Architectural patterns in fruit set depend on within-id variance in phenology
-
-# Q6: Effects of flower position on ovule number
+## Ovule number
 
 Does ovule number of individual flowers depend on flower position within and among the raceme?
 
@@ -1056,35 +756,6 @@ hist(data_id_flowers$n_ovules)
 ```
 
 Looks quite normal
-
-## Model all years
-
-```{r}
-mod_ov_all<-glmmTMB(n_ovules~(relpos_fl*relpos_rac)*year+
-                      (1|id/shoot_id/raceme_id),data_id_flowers)
-# OK with random factors and nesting?
-summary(mod_ov_all)
-Anova(mod_ov_all)
-```
-
-### Diagnostics
-
-```{r}
-plot(simulateResiduals(mod_ov_all,n=1000))
-```
-
-### Figure 6
-
-```{r}
-fig6_all<-grid.arrange(
-  plot(ggpredict(mod_ov_all,terms=c("relpos_fl[all]"))),
-  plot(ggpredict(mod_ov_all,terms=c("relpos_rac[all]"))),
-  ncol=2)
-ggsave(filename="output/figures/fig6_all.tiff",plot=fig6_all,
-       width=18,height=8,units="cm",dpi=300)
-```
-
-## Yearly models
 
 ```{r}
 mod_ov_87<-glmmTMB(n_ovules~relpos_fl*relpos_rac+
@@ -1119,20 +790,11 @@ plot(simulateResiduals(mod_ov_87,n=1000))
 plot(simulateResiduals(mod_ov_88,n=1000))
 plot(simulateResiduals(mod_ov_89,n=1000))
 ```
-### Table 3
+
+### Figure 5
 
 ```{r}
-tab_model(mod_ov_87,mod_ov_88,mod_ov_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),
-          file="output/tables/Table3.doc")
-```
-
-### Figure 6
-
-```{r}
-fig6<-grid.arrange(
+fig5<-grid.arrange(
   plot(ggpredict(mod_ov_88,
                  terms=c("relpos_fl[quart]","relpos_rac[quart]")))+
     ggtitle("1988"),
@@ -1140,64 +802,17 @@ fig6<-grid.arrange(
                  terms=c("relpos_fl[quart]","relpos_rac[quart]")))+
     ggtitle("1989"),
   ncol=2)
-ggsave(filename="output/figures/fig6.tiff",plot=fig6,
+ggsave(filename="output/figures/fig5.tiff",plot=fig5,
        width=18,height=8,units="cm",dpi=300)
 ```
 
 No significant effects on ovule number in 1987. Main effects non-significant but interaction significant in 1988. Main effects and interaction significant in 1989.
 
-# Q5: Effects of flower position on seed predation
+## Seed predation
 
 Does seed predation of individual flowers depend on flower position within and among the racemes?
 
 H: We expect that basal flowers have a higher seed predation than distal flowers within the raceme, and that flowers on basal racemes have a higher seed predation than flowers on distal racemes.
-
-## Model all years
-
-### Proportion of predated seeds
-
-```{r}
-mod_seedpred_all<-glmmTMB(cbind(round(n_pred_seeds),n_seeds)~
-                            (relpos_fl*relpos_rac)*year+
-                            (1|id/shoot_id/raceme_id),
-                          data_id_flowers,family="binomial")
-summary(mod_seedpred_all)
-Anova(mod_seedpred_all)
-```
-
-### Seed predation y/n
-
-```{r}
-mod_seedpred_yn_all<-glmmTMB(seed_predation~(relpos_fl*relpos_rac)*year+
-                      (1|id/shoot_id/raceme_id),
-                    data_id_flowers,family="binomial")
-# OK with random factors and nesting?
-summary(mod_seedpred_yn_all)
-Anova(mod_seedpred_yn_all)
-```
-
-### Diagnostics
-
-```{r}
-plot(simulateResiduals(mod_seedpred_all,n=1000))
-plot(simulateResiduals(mod_seedpred_yn_all,n=1000))
-```
-
-### Figure 7
-
-```{r}
-fig7_all<-grid.arrange(
-  plot(ggpredict(mod_seedpred_all,terms=c("relpos_fl[all]")))+
-    ggtitle("Proportion of predated seeds"),
-  plot(ggpredict(mod_seedpred_yn_all,terms=c("relpos_fl[all]")))+
-    ggtitle("Seed predation y/n"),
-  ncol=2)
-ggsave(filename="output/figures/fig7_all.tiff",plot=fig7_all,
-       width=18,height=8,units="cm",dpi=300)
-```
-
-
-## Yearly models
 
 ### Proportion of predated seeds
 
@@ -1299,28 +914,10 @@ plot(simulateResiduals(mod_seedpred_yn_88,n=1000))
 plot(simulateResiduals(mod_seedpred_yn_89,n=1000))
 ```
 
-### Table 4
+### Figure 6
 
 ```{r}
-tab_model(mod_seedpred_87,mod_seedpred_88,mod_seedpred_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),
-          file="output/tables/Table4a.doc")
-```
-
-```{r}
-tab_model(mod_seedpred_yn_87,mod_seedpred_yn_88,mod_seedpred_yn_89,
-          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
-          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
-          dv.labels=c("1987","1988","1989"),
-          file="output/tables/Table4b.doc")
-```
-
-### Figure 7
-
-```{r}
-fig7<-grid.arrange(
+fig6<-grid.arrange(
   plot(ggpredict(mod_seedpred_89,terms="relpos_fl[all]"))+
     ggtitle("Proportion of predated seeds 1989"),
   grid.arrange(
@@ -1333,10 +930,539 @@ fig7<-grid.arrange(
                    allow.new.levels=T))+ggtitle("1989"), # p=0.0542
   ncol=3),
 ncol=1)
-ggsave(filename="output/figures/fig7.tiff",plot=fig7,
+ggsave(filename="output/figures/fig6.tiff",plot=fig6,
        width=18,height=18,units="cm",dpi=300)
 ```
 
+## Table 1
+
+```{r}
+tab_model(mod_phen_87,mod_phen_88,mod_phen_89,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),
+          file="output/tables/Table1a.doc")
+```
+
+```{r}
+tab_model(mod_frset_87,mod_frset_88,mod_frset_89,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),title="Fruit set",
+          file="output/tables/Table1b.doc")
+```
+
+```{r}
+tab_model(mod_seedset_87,mod_seedset_88,mod_seedset_89,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),title="Seed set",
+          file="output/tables/Table1c.doc")
+```
+
+```{r}
+tab_model(mod_ov_87,mod_ov_88,mod_ov_89,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),
+          file="output/tables/Table1d.doc")
+```
+
+```{r}
+tab_model(mod_seedpred_87,mod_seedpred_88,mod_seedpred_89,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),
+          file="output/tables/Table1e.doc")
+```
+
+```{r}
+tab_model(mod_seedpred_yn_87,mod_seedpred_yn_88,mod_seedpred_yn_89,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),
+          file="output/tables/Table1f.doc")
+```
+
+# Q3: Effects on reproductive success due to resources or phenology
+
+Fit the same models as before for fruit set but including opening_date_v.
+
+```{r}
+mod_frset_phen_87<-glmmTMB(fruit_set~relpos_fl*relpos_rac+opening_date_v+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_phen_88<-glmmTMB(fruit_set~relpos_fl+relpos_rac+opening_date_v+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_phen_89<-glmmTMB(fruit_set~relpos_fl+relpos_rac+opening_date_v+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1989),family="binomial")
+# OK with random factors and nesting?
+summary(mod_frset_phen_87)
+summary(mod_frset_phen_88)
+summary(mod_frset_phen_89)
+```
+
+Flowers opening earlier have a higher probability of setting fruit. 
+
+1987: When including opening date in the model, the interaction is still significant, but in this case basal flowers on basal racemes (lower relpos_fl and lower relpos_rac) have the highest probabilities of setting fruit, and distal flowers on basal racemes (higher relpos_fl and lower relpos_rac) the lowest (the lines cross). The contribution of the effect of flower position among racemes to the interaction changes when including opening date in the model. Does this indicate that the effect of flower position among racemes is mainly due to different phenologies of individual flowers?
+
+1988 and 1989: Basal flowers (lower relpos_fl) have a higher probability of initiating fruit than distal flowers within the raceme. 
+
+The effect of flower position among racemes seems to be mainly due to different phenologies of individual flowers, and the effect of flower position within the raceme seems to be mainly due to different resource accessibility. 
+
+Build the piecewise SEMs:
+
+```{r}
+path_frset_87<-psem(mod_frset_phen_87,mod_phen_87)
+path_frset_88<-psem(mod_frset_phen_88,mod_phen_88)
+path_frset_89<-psem(mod_frset_phen_89,mod_phen_89)
+```
+
+```{r}
+summary(path_frset_87)
+summary(path_frset_88)
+summary(path_frset_89)
+```
+
+Models for fruit set are singular (checked using performance::check_singularity).
+Singularity disappears when removing random effects of raceme_id and shoot_id.
+Only problem is for calculating R squared values (that we so far not show in the figure), so OK so far. If we want to show models without those random effects not included, results in terms of coefficients, etc are similar. 
+
+Plots:
+
+```{r}
+plot_path_frset_87<-plot(path_frset_87,layout="tree",
+                          node_attrs=data.frame(shape="rectangle",
+                                                color="black",fillcolor="white",
+                                                fontsize=8,
+                                                fontname="Times-Roman",
+                                                fixedsize=F),
+                          edge_attrs=data.frame(style="solid",color="grey",
+                                                fontsize=8,
+                                                fontname="Times-Roman"),
+                          title="1987")
+plot_path_frset_88<-plot(path_frset_88,layout="tree",
+                         node_attrs=data.frame(shape="rectangle",
+                                               color="black",fillcolor="white",
+                                               fontsize=8,
+                                               fontname="Times-Roman",
+                                               fixedsize=F),
+                         edge_attrs=data.frame(style="solid",color="grey",
+                                               fontsize=8,
+                                               fontname="Times-Roman"),
+                         title="1988")
+plot_path_frset_89<-plot(path_frset_89,layout="tree",
+                         node_attrs=data.frame(shape="rectangle",
+                                               color="black",fillcolor="white",
+                                               fontsize=8,
+                                               fontname="Times-Roman",
+                                               fixedsize=F),
+                         edge_attrs=data.frame(style="solid",color="grey",
+                                               fontsize=8,
+                                               fontname="Times-Roman"),
+     title="1989")
+```
+
+```{r}
+save_png(plot_path_frset_87,"output/figures/plot_path_frset_87.png")
+save_png(plot_path_frset_88,"output/figures/plot_path_frset_88.png")
+save_png(plot_path_frset_89,"output/figures/plot_path_frset_89.png")
+writeLines(export_svg(plot_path_frset_87),
+           "output/figures/plot_path_frset_87.svg")
+writeLines(export_svg(plot_path_frset_88),
+           "output/figures/plot_path_frset_88.svg")
+writeLines(export_svg(plot_path_frset_89),
+           "output/figures/plot_path_frset_89.svg")
+```
+
+## Figure 7: Path models (Inkscape)
+
+# Q4: Strength of flower position effects on fruit set depend on fruit initiation and flowering duration
+
+## Fruit initiation
+
+```{r}
+mod_frset_87_Q4a<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)* 
+                           # Interaction * in mod_frset_87 
+                           tot_fr_init_in_plant+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_88_Q4a<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_88 
+                           tot_fr_init_in_plant+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_Q4a<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_89 
+                           tot_fr_init_in_plant+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1989),family="binomial")
+summary(mod_frset_87_Q4a)
+summary(mod_frset_88_Q4a)
+summary(mod_frset_89_Q4a)
+Anova(mod_frset_87_Q4a)
+Anova(mod_frset_88_Q4a)
+Anova(mod_frset_89_Q4a)
+```
+
+## Flowering duration
+
+### Range of opening date
+
+```{r}
+mod_frset_87_Q4b<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)* 
+                           # Interaction * in mod_frset_87 
+                           range_opening_date+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_88_Q4b<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_88 
+                           range_opening_date+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_Q4b<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_89 
+                           range_opening_date+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1989),family="binomial")
+summary(mod_frset_87_Q4b)
+summary(mod_frset_88_Q4b)
+summary(mod_frset_89_Q4b)
+Anova(mod_frset_87_Q4b)
+Anova(mod_frset_88_Q4b)
+Anova(mod_frset_89_Q4b)
+```
+
+### TO DO: Variance of opening date
+
+## Fruit initiation & flowering duration (rename these models)
+
+```{r}
+mod_frset_87_Q4ab<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)* 
+                           # Interaction * in mod_frset_87 
+                           (tot_fr_init_in_plant+range_opening_date)+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_88_Q4ab<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_88 
+                           (tot_fr_init_in_plant+range_opening_date)+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_Q4ab<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_89 
+                           (tot_fr_init_in_plant+range_opening_date)+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1989),family="binomial")
+summary(mod_frset_87_Q4ab)
+summary(mod_frset_88_Q4ab)
+summary(mod_frset_89_Q4ab)
+Anova(mod_frset_87_Q4ab)
+Anova(mod_frset_88_Q4ab)
+Anova(mod_frset_89_Q4ab)
+```
+
+## Figure 6: Q4
+
+```{r}
+plot(ggpredict(mod_frset_87_Q4ab,
+               terms=c("relpos_fl[all]","relpos_rac[quart]",
+                       "range_opening_date")))
+# Not sure if according to prediction or not!
+plot(ggpredict(mod_frset_88_Q4ab,
+               terms=c("relpos_fl[all]","tot_fr_init_in_plant[quart]")))
+# According to prediction: higher fruit initiation = stronger effect
+plot(ggpredict(mod_frset_88_Q4ab,
+               terms=c("relpos_fl[all]","range_opening_date[quart]")))
+# Opposite to prediction: smaller range = weaker effect
+plot(ggpredict(mod_frset_89_Q4ab,
+               terms=c("relpos_rac[all]","range_opening_date[quart]")))
+# According to prediction: smaller range = stronger effect
+```
+
+# NOT USED: Models all years
+
+## Q2: Effects of flower position on flowering phenology 
+
+Including year as a factor and interactions
+
+```{r}
+mod_phen_all<-glmmTMB(opening_date_v~(relpos_fl*relpos_rac)*year+
+                       (1|id/shoot_id/raceme_id),data_id_flowers)
+# OK with random factors and nesting?
+summary(mod_phen_all)
+Anova(mod_phen_all)
+```
+
+### Diagnostics
+
+```{r}
+plot(simulateResiduals(mod_phen_all,n=1000))
+```
+
+### Table 1 all
+
+```{r}
+tab_model(mod_phen_all,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          file="output/tables/Table1_all.doc")
+```
+
+### Figure 3 all
+
+```{r}
+fig3_all<-grid.arrange(plot(ggpredict(mod_phen_all,
+               terms=c("relpos_fl[quart]","relpos_rac[quart]","year"))))
+ggsave(filename="output/figures/fig3_all.tiff",plot=fig3_all,
+       width=20,height=8,units="cm",dpi=300)
+```
+
+## Q3: Effects of flower position on reproductive success
+
+### NOT USED: Probability of initiating fruit
+
+#### Without phenology
+
+```{r}
+mod_frinit_all<-glmmTMB(initiated_fr~(relpos_fl*relpos_rac)*year+
+                      (1|id/shoot_id/raceme_id),data_id_flowers,
+                      family="binomial")
+# OK with random factors and nesting?
+summary(mod_frinit_all)
+Anova(mod_frinit_all)
+```
+
+#### With phenology
+
+```{r}
+mod_frinit_phen_all<-glmmTMB(initiated_fr~
+                               (relpos_fl*relpos_rac+opening_date_v)*year+
+                               (1|id/shoot_id/raceme_id),
+                             data_id_flowers,family="binomial")
+# OK with random factors and nesting?
+summary(mod_frinit_phen_all)
+Anova(mod_frinit_phen_all)
+```
+
+### Probability of setting fruit
+
+#### Without phenology
+
+```{r}
+mod_frset_all<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)*year+
+                      (1|id/shoot_id/raceme_id),
+                    data_id_flowers,family="binomial")
+# OK with random factors and nesting?
+summary(mod_frset_all)
+Anova(mod_frset_all)
+```
+
+#### With phenology
+
+```{r}
+mod_frset_phen_all<-glmmTMB(fruit_set~
+                              (relpos_fl*relpos_rac+opening_date_v)*year+
+                      (1|id/shoot_id/raceme_id),
+                    data_id_flowers,family="binomial")
+# OK with random factors and nesting?
+summary(mod_frset_phen_all)
+Anova(mod_frset_phen_all)
+```
+
+### Seed set
+
+#### Without phenology
+
+```{r}
+mod_seedset_all<-glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~
+                           (relpos_fl*relpos_rac)*year+
+                           (1|id/shoot_id/raceme_id),
+                         data_id_flowers,family="binomial")
+summary(mod_seedset_all)
+Anova(mod_seedset_all)
+```
+
+No significant effects on seed set (apart from year).
+
+Not fitting models with phenology because we found no effects of flower position on seed set.
+
+### Diagnostics
+
+```{r}
+plot(simulateResiduals(mod_frinit_all,n=1000))
+plot(simulateResiduals(mod_frinit_phen_all,n=1000))
+plot(simulateResiduals(mod_frset_all,n=1000))
+plot(simulateResiduals(mod_frset_phen_all,n=1000))
+plot(simulateResiduals(mod_seedset_all,n=1000))
+```
+
+### Figure 4 all
+
+```{r}
+fig_frinit_all<-grid.arrange(
+  plot(ggpredict(mod_frinit_all,
+                 terms=c("relpos_fl[quart]","relpos_rac[quart]","year")))+
+    ggtitle("A) Fruit initiation, without opening date"),
+  plot(ggpredict(mod_frinit_phen_all,
+                 terms=c("relpos_fl[quart]","relpos_rac[quart]","year")))+
+    ggtitle("B) Fruit initiation, with opening date"),
+  plot(ggpredict(mod_frinit_phen_all,terms=c("opening_date_v"))),
+  ncol=1)
+fig_frinit_all
+```
+
+```{r}
+fig4_all<-grid.arrange(
+  plot(ggpredict(mod_frset_all,terms=c("relpos_fl[all]","year")))+
+    ggtitle("A) Fruit set, without opening date"),
+  plot(ggpredict(mod_frset_all,terms=c("relpos_rac[all]")))+ggtitle(NULL),
+  plot(ggpredict(mod_frset_phen_all,terms=c("relpos_fl[all]")))+
+    ggtitle("B) Fruit set, with opening date"),
+  plot(ggpredict(mod_frset_phen_all,terms=c("opening_date_v")))+ggtitle(NULL),
+  ncol=2,nrow=2)
+fig4_all
+ggsave(filename="output/figures/fig4_all.tiff",plot=fig4_all,
+       width=18,height=12,units="cm",dpi=300)
+```
+
+## Q6: Effects of flower position on ovule number
+
+```{r}
+mod_ov_all<-glmmTMB(n_ovules~(relpos_fl*relpos_rac)*year+
+                      (1|id/shoot_id/raceme_id),data_id_flowers)
+# OK with random factors and nesting?
+summary(mod_ov_all)
+Anova(mod_ov_all)
+```
+
+### Diagnostics
+
+```{r}
+plot(simulateResiduals(mod_ov_all,n=1000))
+```
+
+### Figure 7 all
+
+```{r}
+fig7_all<-grid.arrange(
+  plot(ggpredict(mod_ov_all,terms=c("relpos_fl[all]"))),
+  plot(ggpredict(mod_ov_all,terms=c("relpos_rac[all]"))),
+  ncol=2)
+ggsave(filename="output/figures/fig7_all.tiff",plot=fig7_all,
+       width=18,height=8,units="cm",dpi=300)
+```
+
+## Q7: Effects of flower position on seed predation
+
+### Proportion of predated seeds
+
+```{r}
+mod_seedpred_all<-glmmTMB(cbind(round(n_pred_seeds),n_seeds)~
+                            (relpos_fl*relpos_rac)*year+
+                            (1|id/shoot_id/raceme_id),
+                          data_id_flowers,family="binomial")
+summary(mod_seedpred_all)
+Anova(mod_seedpred_all)
+```
+
+### Seed predation y/n
+
+```{r}
+mod_seedpred_yn_all<-glmmTMB(seed_predation~(relpos_fl*relpos_rac)*year+
+                      (1|id/shoot_id/raceme_id),
+                    data_id_flowers,family="binomial")
+# OK with random factors and nesting?
+summary(mod_seedpred_yn_all)
+Anova(mod_seedpred_yn_all)
+```
+
+### Diagnostics
+
+```{r}
+plot(simulateResiduals(mod_seedpred_all,n=1000))
+plot(simulateResiduals(mod_seedpred_yn_all,n=1000))
+```
+
+### Figure 8 all
+
+```{r}
+fig8_all<-grid.arrange(
+  plot(ggpredict(mod_seedpred_all,terms=c("relpos_fl[all]")))+
+    ggtitle("Proportion of predated seeds"),
+  plot(ggpredict(mod_seedpred_yn_all,terms=c("relpos_fl[all]")))+
+    ggtitle("Seed predation y/n"),
+  ncol=2)
+ggsave(filename="output/figures/fig8_all.tiff",plot=fig8_all,
+       width=18,height=8,units="cm",dpi=300)
+```
+
+# NOT USED: Q3 (fruit initiation)
+
+## Without phenology
+
+```{r}
+mod_frinit_87<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1987),family="binomial")
+mod_frinit_88<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1988),family="binomial")
+mod_frinit_89<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1989),family="binomial")
+# OK with random factors and nesting?
+summary(mod_frinit_87)
+summary(mod_frinit_88)
+summary(mod_frinit_89)
+```
+
+Interaction only significant in 1989 (marginally significant in 1988). Refit models for 1987 and 1988 without interaction.
+
+```{r}
+mod_frinit_87<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1987),family="binomial")
+mod_frinit_88<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1988),family="binomial")
+# OK with random factors and nesting?
+summary(mod_frinit_87)
+summary(mod_frinit_88)
+```
+
+Basal flowers (lower relpos_fl) have a higher probability of initiating fruit than distal flowers within the raceme.
+Flowers on basal racemes (lower relpos_rac) have a higher probability of initiating fruit than flowers on distal racemes.
+In 1989, basal flowers on basal racemes (lower relpos_fl and lower relpos_rac) have the highest probabilities of initiating fruit, and distal flowers on distal racemes (higher relpos_fl and higher relpos_rac) the lowest.
+
+#### With phenology
+
+Fit the same models as before but including opening_date_v.
+
+```{r}
+mod_frinit_phen_87<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+opening_date_v+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1987),family="binomial")
+mod_frinit_phen_88<-glmmTMB(initiated_fr~relpos_fl+relpos_rac+opening_date_v+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1988),family="binomial")
+mod_frinit_phen_89<-glmmTMB(initiated_fr~relpos_fl*relpos_rac+opening_date_v+
+                      (1|id/shoot_id/raceme_id),
+                    subset(data_id_flowers,year==1989),family="binomial")
+# OK with random factors and nesting?
+summary(mod_frinit_phen_87)
+summary(mod_frinit_phen_88)
+summary(mod_frinit_phen_89)
+```
+
+Flowers opening earlier have a higher probability of initiating fruit. 
+
+1987 and 1988: Basal flowers (lower relpos_fl) have a higher probability of initiating fruit than distal flowers within the raceme. 
+
+1989: When including opening date in the model, the interaction is still significant, but in this case distal flowers on distal racemes (higher relpos_fl and higher relpos_rac) have the lowest probabilities of intiating fruit, and basal flowers on distal racemes (lower relpos_fl and higher relpos_rac) the highest (the lines cross). The contribution of the effect of flower position among racemes to the interaction changes when including opening date in the model. Does this indicate that the effect of flower position among racemes is mainly due to different phenologies of individual flowers?
+
+The effect of flower position among racemes seems to be mainly due to different phenologies of individual flowers, and the effect of flower position within the raceme seems to be mainly due to different resource accessibility. 
 
 # Session info
 
