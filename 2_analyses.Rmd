@@ -817,13 +817,16 @@ H: We expect that basal flowers have a higher seed predation than distal flowers
 ### Proportion of predated seeds
 
 ```{r}
-mod_seedpred_87<-glmmTMB(cbind(n_pred_seeds,n_seeds)~relpos_fl*relpos_rac+
+mod_seedpred_87<-glmmTMB(cbind(n_pred_seeds,n_seeds-n_pred_seeds)~
+                           relpos_fl*relpos_rac+
                           (1|id/shoot_id/raceme_id),
                         subset(data_id_flowers,year==1987),family="binomial")
-mod_seedpred_88<-glmmTMB(cbind(n_pred_seeds,n_seeds)~relpos_fl*relpos_rac+
+mod_seedpred_88<-glmmTMB(cbind(n_pred_seeds,n_seeds-n_pred_seeds)~
+                           relpos_fl*relpos_rac+
                           (1|id/shoot_id/raceme_id),
                         subset(data_id_flowers,year==1988),family="binomial")
-mod_seedpred_89<-glmmTMB(cbind(round(n_pred_seeds),n_seeds)~relpos_fl*relpos_rac+
+mod_seedpred_89<-glmmTMB(cbind(round(n_pred_seeds),n_seeds-round(n_pred_seeds))~
+                           relpos_fl*relpos_rac+
                           (1|id/shoot_id/raceme_id),
                         subset(data_id_flowers,year==1989),family="binomial")
 summary(mod_seedpred_87)
@@ -834,13 +837,16 @@ summary(mod_seedpred_89)
 Interaction not significant in any of the years. Refit models without interaction.
 
 ```{r}
-mod_seedpred_87<-glmmTMB(cbind(n_pred_seeds,n_seeds)~relpos_fl+relpos_rac+
+mod_seedpred_87<-glmmTMB(cbind(n_pred_seeds,n_seeds-n_pred_seeds)~
+                           relpos_fl+relpos_rac+
                           (1|id/shoot_id/raceme_id),
                         subset(data_id_flowers,year==1987),family="binomial")
-mod_seedpred_88<-glmmTMB(cbind(n_pred_seeds,n_seeds)~relpos_fl+relpos_rac+
+mod_seedpred_88<-glmmTMB(cbind(n_pred_seeds,n_seeds-n_pred_seeds)~
+                           relpos_fl+relpos_rac+
                           (1|id/shoot_id/raceme_id),
                         subset(data_id_flowers,year==1988),family="binomial")
-mod_seedpred_89<-glmmTMB(cbind(round(n_pred_seeds),n_seeds)~relpos_fl+relpos_rac+
+mod_seedpred_89<-glmmTMB(cbind(round(n_pred_seeds),n_seeds-round(n_pred_seeds))~
+                           relpos_fl+relpos_rac+
                           (1|id/shoot_id/raceme_id),
                         subset(data_id_flowers,year==1989),family="binomial")
 summary(mod_seedpred_87)
@@ -848,13 +854,15 @@ summary(mod_seedpred_88)
 summary(mod_seedpred_89)
 ```
 
-Only significant effect of relpos_fl in 1989
+Significant effect of relpos_fl in all years
 
 ```{r}
-plot(ggpredict(mod_seedpred_89,terms="relpos_fl"))
+plot(ggpredict(mod_seedpred_87,terms="relpos_fl[all]"))
+plot(ggpredict(mod_seedpred_87,terms="relpos_fl[all]"))
+plot(ggpredict(mod_seedpred_87,terms="relpos_fl[all]"))
 ```
 
-In 1989, basal flowers (lower relpos_fl) have a higher seed predation than distal flowers within the raceme.
+Basal flowers (lower relpos_fl) have a higher seed predation than distal flowers within the raceme.
 
 ### Seed predation y/n
 
@@ -918,8 +926,15 @@ plot(simulateResiduals(mod_seedpred_yn_89,n=1000))
 
 ```{r}
 fig6<-grid.arrange(
-  plot(ggpredict(mod_seedpred_89,terms="relpos_fl[all]"))+
-    ggtitle("Proportion of predated seeds 1989"),
+  grid.arrange(
+    plot(ggpredict(mod_seedpred_89,terms="relpos_fl[all]"))+
+    ggtitle("Proportion of predated seeds 1987"),
+    plot(ggpredict(mod_seedpred_89,terms="relpos_fl[all]"))+
+    ggtitle("1988"),
+    plot(ggpredict(mod_seedpred_89,terms="relpos_fl[all]"))+
+    ggtitle("1989"),
+    ncol=3
+  ),
   grid.arrange(
     plot(ggpredict(mod_seedpred_yn_87,terms="relpos_fl[all]"
                    ,allow.new.levels=T))+
@@ -931,7 +946,7 @@ fig6<-grid.arrange(
   ncol=3),
 ncol=1)
 ggsave(filename="output/figures/fig6.tiff",plot=fig6,
-       width=18,height=18,units="cm",dpi=300)
+       width=30,height=20,units="cm",dpi=300)
 ```
 
 ## Table 1
@@ -1135,9 +1150,36 @@ Anova(mod_frset_88_Q4b)
 Anova(mod_frset_89_Q4b)
 ```
 
-### TO DO: Variance of opening date
+### Variance of opening date
 
-## Fruit initiation & flowering duration (rename these models)
+```{r}
+mod_frset_87_Q4c<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)* 
+                           # Interaction * in mod_frset_87 
+                           var_opening_date+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_88_Q4c<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_88 
+                           var_opening_date+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_Q4c<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_89 
+                           var_opening_date+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1989),family="binomial")
+summary(mod_frset_87_Q4c)
+summary(mod_frset_88_Q4c)
+summary(mod_frset_89_Q4c)
+Anova(mod_frset_87_Q4c)
+Anova(mod_frset_88_Q4c)
+Anova(mod_frset_89_Q4c)
+```
+
+
+## Fruit initiation & flowering duration
+
+### USE: Fruit initiation & range
 
 ```{r}
 mod_frset_87_Q4ab<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)* 
@@ -1163,22 +1205,68 @@ Anova(mod_frset_88_Q4ab)
 Anova(mod_frset_89_Q4ab)
 ```
 
-## Figure 6: Q4
+#### Table 3
 
 ```{r}
-plot(ggpredict(mod_frset_87_Q4ab,
-               terms=c("relpos_fl[all]","relpos_rac[quart]",
-                       "range_opening_date")))
-# Not sure if according to prediction or not!
-plot(ggpredict(mod_frset_88_Q4ab,
-               terms=c("relpos_fl[all]","tot_fr_init_in_plant[quart]")))
-# According to prediction: higher fruit initiation = stronger effect
-plot(ggpredict(mod_frset_88_Q4ab,
-               terms=c("relpos_fl[all]","range_opening_date[quart]")))
-# Opposite to prediction: smaller range = weaker effect
-plot(ggpredict(mod_frset_89_Q4ab,
-               terms=c("relpos_rac[all]","range_opening_date[quart]")))
+tab_model(mod_frset_87_Q4ab,mod_frset_88_Q4ab,mod_frset_89_Q4ab,
+          transform=NULL,show.intercept=F,show.ci=F,show.se=T,show.stat=T,
+          show.r2=T,show.icc=F,show.re.var=F,show.ngroups=F,digits=3,
+          dv.labels=c("1987","1988","1989"),
+          file="output/tables/Table3.doc")
+```
+
+### Fruit initiation & variance
+
+```{r}
+mod_frset_87_Q4ac<-glmmTMB(fruit_set~(relpos_fl*relpos_rac)* 
+                           # Interaction * in mod_frset_87 
+                           (tot_fr_init_in_plant+var_opening_date)+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1987),family="binomial")
+mod_frset_88_Q4ac<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_88 
+                           (tot_fr_init_in_plant+var_opening_date)+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1988),family="binomial")
+mod_frset_89_Q4ac<-glmmTMB(fruit_set~(relpos_fl+relpos_rac)* 
+                           # Interaction NS in mod_frset_89 
+                           (tot_fr_init_in_plant+var_opening_date)+
+                         (1|id/shoot_id/raceme_id),
+                         subset(data_id_flowers,year==1989),family="binomial")
+summary(mod_frset_87_Q4ac)
+summary(mod_frset_88_Q4ac)
+summary(mod_frset_89_Q4ac)
+Anova(mod_frset_87_Q4ac)
+Anova(mod_frset_88_Q4ac)
+Anova(mod_frset_89_Q4ac)
+```
+
+## Figure 8
+
+```{r}
+fig8a<-plot(ggpredict(mod_frset_87_Q4ab,
+                      terms=c("relpos_fl[all]","range_opening_date[quart]",
+                              "relpos_rac")))+
+  ggtitle("1987")
+  # This seems to be against our prediction!
+fig8b<-grid.arrange(
+  plot(ggpredict(mod_frset_88_Q4ab,
+                 terms=c("relpos_fl[all]","tot_fr_init_in_plant[quart]")))+
+    ggtitle("1988"),
+  # According to prediction: higher fruit initiation = stronger effect
+  plot(ggpredict(mod_frset_88_Q4ab,
+                 terms=c("relpos_fl[all]","range_opening_date[quart]")))+
+    ggtitle(NULL),
+  # Opposite to prediction: smaller range = weaker effect)
+  ncol=2)
+fig8c<-plot(ggpredict(mod_frset_89_Q4ab,
+                      terms=c("relpos_rac[all]","range_opening_date[quart]")))+
+  ggtitle("1989")
 # According to prediction: smaller range = stronger effect
+fig8<-grid.arrange(fig8a,fig8b,fig8c,ncol=1)
+plot(fig8)
+ggsave(filename="output/figures/fig8.tiff",plot=fig8,
+       width=30,height=30,units="cm",dpi=300)
 ```
 
 # NOT USED: Models all years
@@ -1268,7 +1356,6 @@ mod_frset_phen_all<-glmmTMB(fruit_set~
                     data_id_flowers,family="binomial")
 # OK with random factors and nesting?
 summary(mod_frset_phen_all)
-Anova(mod_frset_phen_all)
 ```
 
 ### Seed set
