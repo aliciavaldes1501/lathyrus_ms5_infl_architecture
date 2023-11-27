@@ -47,4 +47,58 @@ summary(glmmTMB(cbind(n_seeds,n_ovules-n_seeds)~seed_predation_raceme+
                   (1|id/shoot_id/raceme_id),
                 subset(data_id_flowers_test_test,year==1989),family="binomial"))
 
+###################################################################################
+summary(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                  relpos_rac*seed_predation_raceme+
+                  (1|id/shoot_id/raceme_id),
+                subset(data_id_flowers_test_test,year==1987),family="binomial"))
+summary(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                  relpos_rac*seed_predation_raceme+
+                  (1|id/shoot_id/raceme_id),
+                subset(data_id_flowers_test_test,year==1988),family="binomial"))
+summary(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                  relpos_rac*seed_predation_raceme+
+                  (1|id/shoot_id/raceme_id),
+                subset(data_id_flowers_test_test,year==1989),family="binomial"))
+
+plot(ggpredict(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                    relpos_rac*seed_predation_raceme+
+                    (1|id/shoot_id/raceme_id),
+                  subset(data_id_flowers_test_test,year==1987),family="binomial"),
+          terms=c("relpos_fl[all]","seed_predation_raceme[0:1,by=0.25]")))
+plot(ggpredict(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                         relpos_rac*seed_predation_raceme+
+                         (1|id/shoot_id/raceme_id),
+                       subset(data_id_flowers_test_test,year==1988),family="binomial"),
+               terms=c("relpos_fl[all]","seed_predation_raceme[0:1,by=0.25]")))
+plot(ggpredict(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                         relpos_rac*seed_predation_raceme+
+                         (1|id/shoot_id/raceme_id),
+                       subset(data_id_flowers_test_test,year==1989),family="binomial"),
+               terms=c("relpos_fl[all]","seed_predation_raceme[0:1,by=0.25]")))
+
+######################################################################################
+summary(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                  (1|id/shoot_id/raceme_id),
+                subset(data_id_flowers_test_test,year==1987),family="binomial"))
+summary(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                  (1|id/shoot_id/raceme_id),
+                subset(data_id_flowers_test_test,year==1988),family="binomial"))
+summary(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                  (1|id/shoot_id/raceme_id),
+                subset(data_id_flowers_test_test,year==1989),family="binomial"))
+
+plot(ggpredict(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                         (1|id/shoot_id/raceme_id),
+                       subset(data_id_flowers_test_test,year==1987),family="binomial"),
+               terms=c("relpos_fl[all]","seed_predation_raceme[0:1,by=0.25]")))
+plot(ggpredict(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                         (1|id/shoot_id/raceme_id),
+                       subset(data_id_flowers_test_test,year==1988),family="binomial"),
+               terms=c("relpos_fl[all]","seed_predation_raceme[0:1,by=0.25]")))
+plot(ggpredict(glmmTMB(fruit_set~relpos_fl*seed_predation_raceme+
+                         (1|id/shoot_id/raceme_id),
+                       subset(data_id_flowers_test_test,year==1989),family="binomial"),
+               terms=c("relpos_fl[all]","seed_predation_raceme[0:1,by=0.25]")))
+
 
